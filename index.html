@@ -1,0 +1,914 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>Hiro AR Smart Computer</title>
+
+  <!-- A-Frame + AR.js -->
+  <script src="https://aframe.io/releases/1.4.2/aframe.min.js"></script>
+  <script src="https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar.js"></script>
+
+  <style>
+    * { box-sizing: border-box; }
+    html, body {
+      margin: 0;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      font-family: Inter, "Segoe UI", Tahoma, Arial, sans-serif;
+      background: #05070b;
+      color: #fff;
+    }
+
+    #ar-container {
+      position: fixed;
+      inset: 0;
+      z-index: 0;
+      background: #05070b;
+    }
+
+    a-scene {
+      position: absolute !important;
+      inset: 0 !important;
+      width: 100% !important;
+      height: 100% !important;
+    }
+
+    .topbar {
+      position: fixed;
+      top: 14px;
+      left: 14px;
+      right: 14px;
+      z-index: 20;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 10px;
+      pointer-events: none;
+    }
+
+    .brand, .status {
+      pointer-events: auto;
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      background: rgba(8, 12, 22, .72);
+      border: 1px solid rgba(255,255,255,.14);
+      border-radius: 16px;
+      box-shadow: 0 10px 30px rgba(0,0,0,.25);
+    }
+
+    .brand {
+      padding: 10px 14px;
+      font-weight: 800;
+      letter-spacing: .2px;
+    }
+
+    .brand small {
+      display: block;
+      margin-top: 2px;
+      opacity: .6;
+      font-size: 10px;
+      font-weight: 500;
+    }
+
+    .status {
+      padding: 9px 12px;
+      font-size: 12px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .dot {
+      width: 9px;
+      height: 9px;
+      border-radius: 50%;
+      background: #ffb020;
+      box-shadow: 0 0 12px #ffb020;
+    }
+    .dot.ready { background:#00e58a; box-shadow:0 0 12px #00e58a; }
+
+    #panel {
+      position: fixed;
+      left: 14px;
+      bottom: 14px;
+      z-index: 30;
+      width: min(390px, calc(100vw - 28px));
+      max-height: min(72vh, 680px);
+      overflow: auto;
+      padding: 14px;
+      border-radius: 22px;
+      background: rgba(7, 11, 20, .78);
+      border: 1px solid rgba(255,255,255,.14);
+      backdrop-filter: blur(22px);
+      -webkit-backdrop-filter: blur(22px);
+      box-shadow: 0 20px 60px rgba(0,0,0,.42);
+    }
+
+    #panel.collapsed .panel-body { display:none; }
+    #panelHeader {
+      display:flex;
+      justify-content:space-between;
+      align-items:center;
+      gap:12px;
+      cursor:pointer;
+      user-select:none;
+    }
+
+    .panel-title { font-size: 14px; font-weight: 800; }
+    .panel-subtitle { font-size: 10px; opacity:.5; margin-top:3px; }
+
+    .section { margin-top: 13px; }
+    .section-title {
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 1.1px;
+      opacity: .5;
+      margin-bottom: 8px;
+    }
+
+    .mode-grid {
+      display:grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap:7px;
+    }
+
+    button, input {
+      font: inherit;
+    }
+
+    button {
+      border: 1px solid rgba(255,255,255,.12);
+      color: #fff;
+      background: rgba(255,255,255,.07);
+      border-radius: 11px;
+      padding: 9px 10px;
+      cursor: pointer;
+      transition: .18s ease;
+    }
+
+    button:hover { background: rgba(255,255,255,.13); }
+    button:active { transform: scale(.97); }
+    button.active {
+      background: linear-gradient(135deg, rgba(0,190,255,.32), rgba(120,70,255,.32));
+      border-color: rgba(80,210,255,.55);
+      box-shadow: 0 0 20px rgba(30,180,255,.12);
+    }
+
+    .input-row {
+      display:flex;
+      gap:7px;
+    }
+
+    input {
+      width:100%;
+      min-width:0;
+      color:#fff;
+      background:rgba(0,0,0,.3);
+      border:1px solid rgba(255,255,255,.13);
+      border-radius:11px;
+      padding:10px 11px;
+      outline:none;
+    }
+    input:focus { border-color:rgba(80,210,255,.6); }
+
+    .control-grid {
+      display:grid;
+      grid-template-columns: 1fr 1fr;
+      gap:8px;
+    }
+
+    .control {
+      background:rgba(255,255,255,.045);
+      padding:9px;
+      border-radius:12px;
+    }
+    .control label {
+      display:flex;
+      justify-content:space-between;
+      font-size:10px;
+      opacity:.7;
+      margin-bottom:5px;
+    }
+    input[type="range"] {
+      padding:0;
+      height:20px;
+      accent-color:#4ed7ff;
+      background:transparent;
+      border:0;
+    }
+
+    .btn-row {
+      display:grid;
+      grid-template-columns: repeat(2,1fr);
+      gap:7px;
+    }
+
+    .hint {
+      margin-top:10px;
+      font-size:10px;
+      line-height:1.5;
+      color:rgba(255,255,255,.5);
+    }
+
+    #toast {
+      position:fixed;
+      top:78px;
+      left:50%;
+      transform:translateX(-50%) translateY(-10px);
+      z-index:50;
+      opacity:0;
+      pointer-events:none;
+      padding:9px 14px;
+      border-radius:12px;
+      background:rgba(5,8,15,.85);
+      border:1px solid rgba(255,255,255,.14);
+      backdrop-filter:blur(15px);
+      transition:.25s ease;
+      font-size:12px;
+    }
+    #toast.show {
+      opacity:1;
+      transform:translateX(-50%) translateY(0);
+    }
+
+    #loading {
+      position:fixed;
+      inset:0;
+      z-index:100;
+      display:flex;
+      justify-content:center;
+      align-items:center;
+      background:#05070b;
+      transition:.4s ease;
+    }
+    #loading.hide { opacity:0; pointer-events:none; }
+    .loader-card {
+      width:min(330px, calc(100vw - 40px));
+      padding:26px;
+      text-align:center;
+      border-radius:24px;
+      background:rgba(12,17,29,.8);
+      border:1px solid rgba(255,255,255,.12);
+    }
+    .spinner {
+      width:38px;
+      height:38px;
+      margin:0 auto 15px;
+      border:3px solid rgba(255,255,255,.12);
+      border-top-color:#4ed7ff;
+      border-radius:50%;
+      animation:spin 1s linear infinite;
+    }
+    @keyframes spin { to { transform:rotate(360deg); } }
+
+    @media (max-width:600px) {
+      #panel { max-height:55vh; }
+      .topbar { top:8px; left:8px; right:8px; }
+      .brand { font-size:12px; }
+    }
+  </style>
+</head>
+
+<body>
+  <div id="ar-container">
+    <a-scene
+      embedded
+      vr-mode-ui="enabled: false"
+      renderer="antialias: true; colorManagement: true; physicallyCorrectLights: true"
+      arjs="sourceType: webcam; trackingMethod: best; debugUIEnabled: false;">
+
+      <a-assets>
+        <div id="screenContent"></div>
+      </a-assets>
+
+      <a-marker
+        id="hiroMarker"
+        preset="hiro"
+        smooth="true"
+        smoothCount="8"
+        smoothTolerance=".01"
+        smoothThreshold="5">
+
+        <!-- Computer body -->
+        <a-entity id="computer"
+          position="0 0.02 0"
+          rotation="-8 0 0"
+          scale=".001 .001 .001">
+
+          <!-- Monitor -->
+          <a-box
+            id="monitorBody"
+            position="0 1.30 0"
+            width="2.65"
+            height="1.68"
+            depth=".13"
+            material="color:#0b101a; roughness:.32; metalness:.75">
+          </a-box>
+
+          <!-- Screen frame -->
+          <a-box
+            position="0 1.30 -.071"
+            width="2.43"
+            height="1.46"
+            depth=".018"
+            material="color:#02050a; roughness:.15; metalness:.3">
+          </a-box>
+
+          <!-- Screen plane -->
+          <a-plane
+            id="screen"
+            position="0 1.30 -.083"
+            width="2.28"
+            height="1.31"
+            material="shader: flat; color:#10141c; transparent:true">
+          </a-plane>
+
+          <!-- Glass highlight -->
+          <a-plane
+            position="0 1.30 -.093"
+            width="2.28"
+            height="1.31"
+            material="shader: flat; color:#8edcff; opacity:.035; transparent:true; side:double">
+          </a-plane>
+
+          <!-- Webcam -->
+          <a-sphere
+            position="0 2.14 -.09"
+            radius=".035"
+            material="color:#1be0ff; emissive:#1be0ff; emissiveIntensity:2">
+          </a-sphere>
+
+          <!-- Stand -->
+          <a-cylinder
+            position="0 .47 0"
+            radius=".085"
+            height="1.0"
+            material="color:#111827; roughness:.3; metalness:.7">
+          </a-cylinder>
+
+          <a-box
+            position="0 .02 0"
+            width="1.25"
+            height=".08"
+            depth=".55"
+            radius=".04"
+            material="color:#111827; roughness:.25; metalness:.65">
+          </a-box>
+
+          <!-- LED -->
+          <a-box
+            position="0 .49 -.09"
+            width=".35"
+            height=".015"
+            depth=".015"
+            material="color:#20dfff; emissive:#20dfff; emissiveIntensity:1.7">
+          </a-box>
+
+          <!-- Floating UI -->
+          <a-entity id="floatingLabel" position="0 2.45 0">
+            <a-text
+              id="screenTitle"
+              value="AR COMPUTER"
+              align="center"
+              width="3.8"
+              color="#7ee8ff">
+            </a-text>
+          </a-entity>
+
+        </a-entity>
+      </a-marker>
+
+      <a-entity camera></a-entity>
+    </a-scene>
+  </div>
+
+  <div id="loading">
+    <div class="loader-card">
+      <div class="spinner"></div>
+      <div style="font-weight:800;">Hiro AR Computer</div>
+      <div style="font-size:12px;opacity:.55;margin-top:7px;">
+        กำลังเตรียมระบบ AR และกล้อง
+      </div>
+    </div>
+  </div>
+
+  <div class="topbar">
+    <div class="brand">
+      🖥️ Hiro AR Computer
+      <small>Smart AR Interface</small>
+    </div>
+    <div class="status">
+      <span class="dot" id="statusDot"></span>
+      <span id="statusText">ค้นหา Hiro Marker...</span>
+    </div>
+  </div>
+
+  <div id="toast"></div>
+
+  <div id="panel">
+    <div id="panelHeader">
+      <div>
+        <div class="panel-title">AR Computer Control</div>
+        <div class="panel-subtitle">ควบคุมจอที่อยู่บน Hiro Marker</div>
+      </div>
+      <button id="collapseBtn" style="padding:6px 9px;">⌃</button>
+    </div>
+
+    <div class="panel-body">
+      <div class="section">
+        <div class="section-title">Screen Mode</div>
+        <div class="mode-grid">
+          <button class="mode-btn active" data-mode="google">🔎 Google</button>
+          <button class="mode-btn" data-mode="youtube">▶ YouTube</button>
+          <button class="mode-btn" data-mode="instagram">◎ Instagram</button>
+        </div>
+      </div>
+
+      <div class="section" id="youtubeSection" style="display:none;">
+        <div class="section-title">YouTube URL</div>
+        <div class="input-row">
+          <input id="youtubeUrl" placeholder="https://www.youtube.com/watch?v=..." />
+          <button id="loadYoutube">เปิด</button>
+        </div>
+      </div>
+
+      <div class="section" id="googleSection">
+        <div class="section-title">Google / Web Demo</div>
+        <div class="input-row">
+          <input id="googleText" value="AR Smart Building" placeholder="ค้นหา..." />
+          <button id="googleSearch">ค้นหา</button>
+        </div>
+      </div>
+
+      <div class="section" id="instagramSection" style="display:none;">
+        <div class="section-title">Instagram Demo</div>
+        <div class="input-row">
+          <input id="igUser" value="digitalfocus" placeholder="username" />
+          <button id="loadInstagram">เปิด</button>
+        </div>
+      </div>
+
+      <div class="section">
+        <div class="section-title">View / Position</div>
+        <div class="control-grid">
+          <div class="control">
+            <label>ขนาด <span id="scaleVal">1.00</span></label>
+            <input id="scale" type="range" min=".55" max="1.65" step=".01" value="1">
+          </div>
+          <div class="control">
+            <label>ความสูง <span id="heightVal">0.00</span></label>
+            <input id="height" type="range" min="-.5" max="1.8" step=".01" value="0">
+          </div>
+          <div class="control">
+            <label>เอียง X <span id="rotXVal">-8°</span></label>
+            <input id="rotX" type="range" min="-45" max="35" step="1" value="-8">
+          </div>
+          <div class="control">
+            <label>หมุน Y <span id="rotYVal">0°</span></label>
+            <input id="rotY" type="range" min="-180" max="180" step="1" value="0">
+          </div>
+        </div>
+      </div>
+
+      <div class="section">
+        <div class="section-title">Quick View</div>
+        <div class="btn-row">
+          <button id="faceCamera">🎯 หันเข้ากล้อง</button>
+          <button id="resetView">↺ รีเซ็ตมุมมอง</button>
+          <button id="fullscreen">⛶ Fullscreen</button>
+          <button id="hidePanel">◐ ซ่อนแผงควบคุม</button>
+        </div>
+      </div>
+
+      <div class="hint">
+        💡 พิมพ์ URL YouTube แล้วกด “เปิด” เพื่อให้วิดีโอขึ้นบนจอ AR
+        <br>
+        ⚠️ Google และ Instagram ไม่อนุญาตให้เว็บภายนอกฝังหน้าเว็บจริงใน iframe
+        จึงใช้ Smart UI จำลองที่สามารถนำไปต่อยอดเป็น API จริงได้
+      </div>
+    </div>
+  </div>
+
+<script>
+(() => {
+  const $ = id => document.getElementById(id);
+
+  const marker = $("hiroMarker");
+  const computer = $("computer");
+  const screen = $("screen");
+  const screenTitle = $("screenTitle");
+  const loading = $("loading");
+  const statusText = $("statusText");
+  const statusDot = $("statusDot");
+
+  let currentMode = "google";
+  let markerFound = false;
+
+  // ---------- Toast ----------
+  let toastTimer;
+  function toast(message) {
+    const el = $("toast");
+    el.textContent = message;
+    el.classList.add("show");
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => el.classList.remove("show"), 2200);
+  }
+
+  // ---------- Screen texture ----------
+  // Uses a canvas as the monitor display. This avoids iframe/CORS problems
+  // for Google/Instagram and gives a consistent AR presentation.
+  const canvas = document.createElement("canvas");
+  canvas.width = 1280;
+  canvas.height = 720;
+  const ctx = canvas.getContext("2d");
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.minFilter = THREE.LinearFilter;
+  texture.magFilter = THREE.LinearFilter;
+  texture.needsUpdate = true;
+
+  function roundRect(c, x, y, w, h, r) {
+    c.beginPath();
+    c.moveTo(x+r,y);
+    c.arcTo(x+w,y,x+w,y+h,r);
+    c.arcTo(x+w,y+h,x,y+h,r);
+    c.arcTo(x,y+h,x,y,r);
+    c.arcTo(x,y,x+w,y,r);
+    c.closePath();
+  }
+
+  function drawBrowserChrome(title, accent = "#4ed7ff") {
+    ctx.fillStyle = "#0b1018";
+    ctx.fillRect(0,0,1280,720);
+
+    ctx.fillStyle = "#151c27";
+    ctx.fillRect(0,0,1280,66);
+
+    ["#ff5f57","#ffbd2e","#28c840"].forEach((c,i) => {
+      ctx.beginPath();
+      ctx.fillStyle = c;
+      ctx.arc(28+i*26, 31, 7, 0, Math.PI*2);
+      ctx.fill();
+    });
+
+    roundRect(ctx,120,13,970,36,18);
+    ctx.fillStyle = "#0a0f17";
+    ctx.fill();
+
+    ctx.font = "18px Segoe UI, Arial";
+    ctx.fillStyle = "#93a1b5";
+    ctx.fillText(title, 145, 37);
+
+    ctx.fillStyle = accent;
+    ctx.fillRect(0,64,1280,2);
+  }
+
+  function drawGoogle(query="AR Smart Building") {
+    drawBrowserChrome("Google • AR Computer", "#4285f4");
+
+    ctx.fillStyle = "#fff";
+    ctx.font = "700 64px Arial";
+    ctx.fillText("Google", 500, 180);
+
+    roundRect(ctx,260,220,760,58,29);
+    ctx.fillStyle = "#fff";
+    ctx.fill();
+    ctx.strokeStyle = "#dfe1e5";
+    ctx.lineWidth = 2;
+    ctx.stroke();
+
+    ctx.fillStyle = "#202124";
+    ctx.font = "22px Arial";
+    ctx.fillText(query, 295, 257);
+
+    ctx.fillStyle = "#f8f9fa";
+    roundRect(ctx,475,305,145,48,7); ctx.fill();
+    roundRect(ctx,635,305,165,48,7); ctx.fill();
+
+    ctx.fillStyle = "#3c4043";
+    ctx.font = "17px Arial";
+    ctx.fillText("Google Search", 492,336);
+    ctx.fillText("I'm Feeling Lucky", 652,336);
+
+    ctx.fillStyle = "#70757a";
+    ctx.font = "15px Arial";
+    ctx.fillText("AR Smart Search • Interactive 3D Browser", 410,410);
+
+    ctx.fillStyle = "#1a73e8";
+    ctx.font = "22px Arial";
+    ctx.fillText("Smart Building & Intelligent Solutions", 365,470);
+
+    ctx.fillStyle = "#5f6368";
+    ctx.font = "16px Arial";
+    ctx.fillText("Search results can be connected to your own API or website.", 365,505);
+  }
+
+  function youtubeId(url) {
+    try {
+      const u = new URL(url);
+      if (u.hostname.includes("youtu.be")) return u.pathname.substring(1).split("/")[0];
+      if (u.searchParams.get("v")) return u.searchParams.get("v");
+      const m = u.pathname.match(/\/(?:embed|shorts)\/([^/?]+)/);
+      return m ? m[1] : null;
+    } catch(e) {
+      return null;
+    }
+  }
+
+  function drawYoutubePlaceholder(id) {
+    drawBrowserChrome("YouTube • AR Computer", "#ff0033");
+
+    ctx.fillStyle = "#fff";
+    ctx.font = "700 34px Arial";
+    ctx.fillText("YouTube", 95, 116);
+
+    ctx.fillStyle = "#f5f5f5";
+    ctx.font = "16px Arial";
+    ctx.fillText("วิดีโอที่เลือกจะเปิดในจอ AR", 95, 148);
+
+    roundRect(ctx,70,190,1140,430,22);
+    ctx.fillStyle = "#111";
+    ctx.fill();
+
+    ctx.beginPath();
+    ctx.fillStyle = "#ff0033";
+    ctx.arc(640,405,58,0,Math.PI*2);
+    ctx.fill();
+
+    ctx.beginPath();
+    ctx.fillStyle = "#fff";
+    ctx.moveTo(625,378);
+    ctx.lineTo(625,432);
+    ctx.lineTo(670,405);
+    ctx.closePath();
+    ctx.fill();
+
+    ctx.fillStyle = "#ddd";
+    ctx.font = "18px Arial";
+    ctx.textAlign = "center";
+    ctx.fillText(id ? `Video ID: ${id}` : "ใส่ YouTube URL เพื่อโหลดวิดีโอ", 640, 530);
+    ctx.textAlign = "left";
+  }
+
+  function drawInstagram(username="digitalfocus") {
+    drawBrowserChrome("Instagram • AR Computer", "#d62976");
+
+    // Sidebar
+    ctx.fillStyle = "#10141d";
+    ctx.fillRect(0,66,245,654);
+
+    ctx.fillStyle = "#fff";
+    ctx.font = "700 28px Arial";
+    ctx.fillText("Instagram", 32,115);
+
+    const items = ["⌂  Home","⌕  Search","▣  Explore","♡  Reels","✉  Messages","◎  Profile"];
+    items.forEach((t,i) => {
+      ctx.font = i===0 ? "700 18px Arial" : "18px Arial";
+      ctx.fillStyle = i===0 ? "#fff" : "#aeb7c4";
+      ctx.fillText(t,32,175+i*55);
+    });
+
+    // Profile
+    ctx.fillStyle = "#fff";
+    ctx.beginPath();
+    ctx.arc(350,155,45,0,Math.PI*2);
+    ctx.fill();
+
+    ctx.fillStyle = "#171c26";
+    ctx.beginPath();
+    ctx.arc(350,155,38,0,Math.PI*2);
+    ctx.fill();
+
+    ctx.fillStyle = "#fff";
+    ctx.font = "700 23px Arial";
+    ctx.fillText("@"+username,420,150);
+    ctx.font = "15px Arial";
+    ctx.fillStyle = "#aeb7c4";
+    ctx.fillText("AR Creator • Smart Technology",420,180);
+
+    // Post
+    roundRect(ctx,300,235,760,380,15);
+    ctx.fillStyle = "#1a2230";
+    ctx.fill();
+
+    const g = ctx.createLinearGradient(300,235,1060,615);
+    g.addColorStop(0,"#4b1c67");
+    g.addColorStop(.5,"#1d5e8d");
+    g.addColorStop(1,"#0c1728");
+    ctx.fillStyle = g;
+    ctx.fill();
+
+    ctx.fillStyle = "rgba(255,255,255,.9)";
+    ctx.font = "700 35px Arial";
+    ctx.fillText("SMART BUILDING", 535,395);
+    ctx.font = "20px Arial";
+    ctx.fillText("Security • AI • Automation • Robotics", 465,435);
+
+    ctx.fillStyle = "#fff";
+    ctx.font = "18px Arial";
+    ctx.fillText("♡ 1,248     ◯ 86 comments", 335,650);
+  }
+
+  function updateCanvas() {
+    if (currentMode === "google") {
+      drawGoogle($("googleText").value || "AR Smart Building");
+      screenTitle.setAttribute("value", "GOOGLE • SMART BROWSER");
+    } else if (currentMode === "youtube") {
+      const id = youtubeId($("youtubeUrl").value);
+      drawYoutubePlaceholder(id);
+      screenTitle.setAttribute("value", "YOUTUBE • AR PLAYER");
+    } else {
+      drawInstagram($("igUser").value || "digitalfocus");
+      screenTitle.setAttribute("value", "INSTAGRAM • AR SOCIAL");
+    }
+
+    texture.needsUpdate = true;
+    screen.setAttribute("material", {
+      shader: "flat",
+      src: canvas,
+      transparent: false
+    });
+  }
+
+  // ---------- Mode ----------
+  function setMode(mode) {
+    currentMode = mode;
+
+    document.querySelectorAll(".mode-btn").forEach(btn => {
+      btn.classList.toggle("active", btn.dataset.mode === mode);
+    });
+
+    $("youtubeSection").style.display = mode === "youtube" ? "block" : "none";
+    $("googleSection").style.display = mode === "google" ? "block" : "none";
+    $("instagramSection").style.display = mode === "instagram" ? "block" : "none";
+
+    updateCanvas();
+    toast(`เปลี่ยนเป็นโหมด ${mode.toUpperCase()}`);
+  }
+
+  document.querySelectorAll(".mode-btn").forEach(btn => {
+    btn.addEventListener("click", () => setMode(btn.dataset.mode));
+  });
+
+  $("googleSearch").addEventListener("click", () => {
+    updateCanvas();
+    toast("อัปเดตหน้าจอ Google");
+  });
+
+  $("loadInstagram").addEventListener("click", () => {
+    updateCanvas();
+    toast("อัปเดตโปรไฟล์ Instagram");
+  });
+
+  $("loadYoutube").addEventListener("click", () => {
+    const id = youtubeId($("youtubeUrl").value);
+    if (!id) {
+      toast("URL YouTube ไม่ถูกต้อง");
+      return;
+    }
+
+    updateCanvas();
+    openYoutubeOverlay(id);
+  });
+
+  // ---------- Real YouTube overlay ----------
+  function openYoutubeOverlay(id) {
+    let overlay = document.getElementById("ytOverlay");
+
+    if (!overlay) {
+      overlay = document.createElement("div");
+      overlay.id = "ytOverlay";
+      overlay.style.cssText = `
+        position:fixed; inset:0; z-index:80;
+        display:flex; align-items:center; justify-content:center;
+        background:rgba(0,0,0,.82); backdrop-filter:blur(12px);
+      `;
+      overlay.innerHTML = `
+        <div style="width:min(900px,94vw);background:#080b12;border:1px solid rgba(255,255,255,.15);border-radius:20px;padding:10px;box-shadow:0 30px 100px #000;">
+          <div style="display:flex;justify-content:space-between;align-items:center;padding:7px 6px 10px;">
+            <b>▶ YouTube — AR Computer</b>
+            <button id="closeYT" style="padding:6px 10px;">✕</button>
+          </div>
+          <div style="position:relative;padding-bottom:56.25%;height:0;overflow:hidden;border-radius:12px;">
+            <iframe id="ytFrame" style="position:absolute;inset:0;width:100%;height:100%;border:0;"
+              allow="autoplay; encrypted-media; picture-in-picture; fullscreen" allowfullscreen></iframe>
+          </div>
+        </div>
+      `;
+      document.body.appendChild(overlay);
+      document.getElementById("closeYT").onclick = () => overlay.remove();
+    }
+
+    document.getElementById("ytFrame").src =
+      `https://www.youtube.com/embed/${encodeURIComponent(id)}?autoplay=1&rel=0`;
+  }
+
+  // ---------- Marker state ----------
+  marker.addEventListener("markerFound", () => {
+    markerFound = true;
+    statusText.textContent = "Hiro Marker พบแล้ว";
+    statusDot.classList.add("ready");
+
+    computer.setAttribute("animation__in", {
+      property: "scale",
+      from: ".001 .001 .001",
+      to: getScale(),
+      dur: 500,
+      easing: "easeOutElastic"
+    });
+
+    toast("พบ Hiro Marker — Computer พร้อมใช้งาน");
+  });
+
+  marker.addEventListener("markerLost", () => {
+    markerFound = false;
+    statusText.textContent = "ค้นหา Hiro Marker...";
+    statusDot.classList.remove("ready");
+  });
+
+  // ---------- Controls ----------
+  function getScale() {
+    const s = parseFloat($("scale").value);
+    return `${s} ${s} ${s}`;
+  }
+
+  function applyTransform() {
+    computer.setAttribute("scale", getScale());
+
+    const h = parseFloat($("height").value);
+    const rx = parseFloat($("rotX").value);
+    const ry = parseFloat($("rotY").value);
+
+    computer.setAttribute("position", `0 ${0.02 + h} 0`);
+    computer.setAttribute("rotation", `${rx} ${ry} 0`);
+
+    $("scaleVal").textContent = parseFloat($("scale").value).toFixed(2);
+    $("heightVal").textContent = parseFloat(h).toFixed(2);
+    $("rotXVal").textContent = `${rx}°`;
+    $("rotYVal").textContent = `${ry}°`;
+  }
+
+  ["scale","height","rotX","rotY"].forEach(id => {
+    $(id).addEventListener("input", applyTransform);
+  });
+
+  $("faceCamera").addEventListener("click", () => {
+    // A practical default for a marker lying on a table:
+    // screen faces the camera without forcing a top-down view.
+    $("rotX").value = -8;
+    $("rotY").value = 0;
+    applyTransform();
+    toast("ปรับจอเป็นมุมมองด้านหน้าสำหรับกล้องแล้ว");
+  });
+
+  $("resetView").addEventListener("click", () => {
+    $("scale").value = 1;
+    $("height").value = 0;
+    $("rotX").value = -8;
+    $("rotY").value = 0;
+    applyTransform();
+    toast("รีเซ็ตมุมมองแล้ว");
+  });
+
+  $("fullscreen").addEventListener("click", async () => {
+    try {
+      if (!document.fullscreenElement) await document.documentElement.requestFullscreen();
+      else await document.exitFullscreen();
+    } catch(e) {
+      toast("เบราว์เซอร์ไม่อนุญาต Fullscreen");
+    }
+  });
+
+  $("hidePanel").addEventListener("click", () => {
+    $("panel").classList.toggle("collapsed");
+  });
+
+  $("panelHeader").addEventListener("click", e => {
+    if (e.target.closest("button")) return;
+    $("panel").classList.toggle("collapsed");
+  });
+
+  $("collapseBtn").addEventListener("click", e => {
+    e.stopPropagation();
+    $("panel").classList.toggle("collapsed");
+    $("collapseBtn").textContent = $("panel").classList.contains("collapsed") ? "⌄" : "⌃";
+  });
+
+  // ---------- Startup ----------
+  window.addEventListener("load", () => {
+    setTimeout(() => loading.classList.add("hide"), 1200);
+    applyTransform();
+    drawGoogle("AR Smart Building");
+  });
+
+  // Help for camera permission failures
+  window.addEventListener("error", e => {
+    if (String(e.message || "").toLowerCase().includes("camera")) {
+      toast("กรุณาอนุญาต Camera และเปิดผ่าน HTTPS");
+    }
+  });
+})();
+</script>
+</body>
+</html>
